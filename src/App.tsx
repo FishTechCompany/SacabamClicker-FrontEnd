@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/Login';
-import RegisterPage from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ErrorScreen from './pages/ErrorScreen';
@@ -12,11 +11,11 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path='/login' element={<LoginPage />} />
-        <Route path='/register' element={<RegisterPage />} />
+        <Route path='/register' element={<LoginPage defaultTab='signup' />} />
         <Route path='/forgot-password' element={<ForgotPassword />} />
         <Route path='/reset-password' element={<ResetPassword />} />
-        <Route path='/dashboard' element={<Home />} />
-        <Route path='/' element={<Navigate to='/dashboard' replace />} />
+        <Route path='/home' element={<Home />} />
+        <Route path='/' element={<Navigate to='/home' replace />} />
         <Route
           path='*'
           element={
@@ -24,8 +23,8 @@ function App() {
               errorCode={404}
               title='Không tìm thấy trang'
               message='Đường dẫn không hợp lệ'
-              onRetry={() => window.location.replace('/dashboard')}
-              onGoHome={() => window.location.replace('/dashboard')}
+              onRetry={() => window.location.replace('/login')}
+              onGoHome={() => window.location.replace('/login')}
             />
           }
         />
