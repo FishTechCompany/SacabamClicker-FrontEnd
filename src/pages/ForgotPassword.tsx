@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextInput, Title, Text, Group } from '@mantine/core';
+import * as authService from '../api/services/authService';
 
 const validateEmail = (email: string) => {
   return /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email);
@@ -34,11 +35,22 @@ export default function ForgotPassword() {
       return;
     }
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await authService.forgotPassword({ email });
+      if (response.status === 200) {
+        navigate('/reset', { state: { email } });
+      } else {
+        setError(response.message || 'Có lỗi xảy ra');
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Có lỗi xảy ra khi gửi OTP';
+      setError(message);
+    } finally {
       setLoading(false);
-      navigate('/reset-password', { state: { email } });
-    }, 800);
+    }
   };
 
   return (

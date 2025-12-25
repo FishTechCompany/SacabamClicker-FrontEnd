@@ -1,12 +1,6 @@
 import { create } from 'zustand';
-import axiosInstance from '../api/config/axiosConfig';
-import { mockLogin, mockSignup } from '../mocks/authMock';
-
-type UserInfo = {
-  email: string;
-  role?: string;
-  permissions?: string[];
-};
+import * as authService from '../api/services/authService';
+import type { UserInfo, GameProfile } from '../types/api';
 
 type LoginPayload = {
   email: string;
@@ -16,12 +10,13 @@ type LoginPayload = {
 type RegisterPayload = {
   email: string;
   password: string;
-  confirmPassword?: string;
+  confirmPassword: string;
 };
 
 type AuthState = {
   token: string | null;
   user: UserInfo | null;
+  profile: GameProfile | null;
   loading: boolean;
   error: string | null;
   login: (payload: LoginPayload) => Promise<void>;
@@ -32,23 +27,23 @@ type AuthState = {
 
 const TOKEN_KEY = 'accessToken';
 const USER_KEY = 'authUser';
-
-// Trong giai đoạn chưa có API thật, ưu tiên dùng mock.
-// Khi backend sẵn sàng và cấu hình VITE_API_URL, store sẽ tự chuyển sang gọi API thật.
-const USE_MOCK = !import.meta.env.VITE_API_URL;
+const PROFILE_KEY = 'authProfile';
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   user: null,
+  profile: null,
   loading: false,
   error: null,
 
   hydrateFromStorage: () => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
+    const storedProfile = localStorage.getItem(PROFILE_KEY);
     set({
       token: storedToken,
       user: storedUser ? JSON.parse(storedUser) : null,
+      profile: storedProfile ? JSON.parse(storedProfile) : null,
       error: null,
     });
   },
@@ -56,34 +51,59 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async ({ email, password }) => {
     set({ loading: true, error: null });
     try {
-      if (USE_MOCK) {
-        const res = await mockLogin({ email, password });
-        if (!res.success || !res.token || !res.user) {
-          throw new Error(res.error || 'Sai tài khoản hoặc mật khẩu');
-        }
-        localStorage.setItem(TOKEN_KEY, res.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-        set({ token: res.token, user: res.user, loading: false, error: null });
-        return;
+      // Gọi API
+      const response = await authService.login({ email, password });
+
+      // Kiểm tra response status
+      if (response.status !== 200 || !response.data) {
+        throw new Error(response.message || 'Đăng nhập thất bại');
       }
 
-      const res = await axiosInstance.post('/auth/login', { email, password });
-      const accessToken = res.data?.accessToken || res.data?.token;
-      const user: UserInfo = res.data?.user || {
-        email,
-        role: res.data?.role,
-        permissions: res.data?.permissions,
-      };
+      const { accessToken, user, profile } = response.data;
 
       if (!accessToken) {
         throw new Error('Không nhận được accessToken từ server');
       }
 
+      // Map profile từ response sang GameProfile đầy đủ
+      const fullProfile: GameProfile | null = profile
+        ? {
+            id: 0, // Sẽ được cập nhật khi gọi API get profile
+            userId: user.id,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            currentScore: profile.currentScore,
+            clickPower: profile.clickPower,
+            upgradeLevel: profile.upgradeLevel,
+            status: 'ACTIVE', // Giá trị mặc định
+            lastActiveAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+        : null;
+
+      // Lưu vào localStorage
       localStorage.setItem(TOKEN_KEY, accessToken);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
+      if (fullProfile) {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(fullProfile));
+      }
 
-      set({ token: accessToken, user, loading: false, error: null });
+      // Lưu vào Zustand store
+      set({
+        token: accessToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          permissions: [], // Sẽ decode từ JWT nếu cần
+        },
+        profile: fullProfile,
+        loading: false,
+        error: null,
+      });
     } catch (err: any) {
+      // Xử lý error từ Backend
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -94,21 +114,24 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async ({ email, password }) => {
+  register: async ({ email, password, confirmPassword }) => {
     set({ loading: true, error: null });
     try {
-      if (USE_MOCK) {
-        const res = await mockSignup({ email, password, username: email });
-        if (!res.success) {
-          throw new Error(res.error || 'Đăng ký thất bại');
-        }
-        set({ loading: false, error: null });
-        return;
+      // Gọi API
+      const response = await authService.register({
+        email,
+        password,
+        confirmPassword,
+      });
+
+      // Kiểm tra response status
+      if (response.status !== 201) {
+        throw new Error(response.message || 'Đăng ký thất bại');
       }
 
-      await axiosInstance.post('/auth/register', { email, password });
       set({ loading: false, error: null });
     } catch (err: any) {
+      // Xử lý error từ Backend
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -120,9 +143,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    // Xóa tất cả dữ liệu từ localStorage
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    set({ token: null, user: null, error: null });
+    localStorage.removeItem(PROFILE_KEY);
+
+    // Clear state trong Zustand
+    set({ token: null, user: null, profile: null, error: null });
+
+    // Redirect về login (sử dụng window.location để đảm bảo không thể back)
+    window.location.href = '/login';
   },
 }));
 

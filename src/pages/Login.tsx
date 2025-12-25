@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { mockLogin, mockSignup } from '../mocks/authMock';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../store/auth';
 import {
   Paper,
   Tabs,
@@ -24,8 +24,9 @@ type LoginPageProps = {
   defaultTab?: 'login' | 'signup';
 };
 
-export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
+export default function LoginPage({}: LoginPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -40,7 +41,20 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
   const [signupConfirmStatus, setSignupConfirmStatus] = useState<
     'idle' | 'error' | 'success'
   >('idle');
-  const [tab, setTab] = useState<'login' | 'signup'>(defaultTab);
+
+  // Đồng bộ tab với URL
+  const [tab, setTab] = useState<'login' | 'signup'>(() => {
+    return location.pathname === '/register' ? 'signup' : 'login';
+  });
+
+  // Cập nhật tab khi URL thay đổi
+  useEffect(() => {
+    if (location.pathname === '/register') {
+      setTab('signup');
+    } else if (location.pathname === '/login') {
+      setTab('login');
+    }
+  }, [location.pathname]);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -63,6 +77,8 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
     return '';
   };
 
+  const login = useAuthStore((state) => state.login); // Lấy action login từ store
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: ValidationErrors = {};
@@ -83,25 +99,22 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
 
     setLoginLoading(true);
 
-    const res = await mockLogin({
-      email: loginEmail,
-      password: loginPassword,
-    });
-
-    setLoginLoading(false);
-
-    if (res.success) {
-      // Lưu token mock để đồng bộ với axios interceptor sau này (nếu cần)
-      if (res.token) {
-        localStorage.setItem('accessToken', res.token);
-      }
-      navigate('/home');
-    } else {
-      setLoginErrors({
-        password: res.error,
+    try {
+      await login({
+        email: loginEmail,
+        password: loginPassword,
       });
+      navigate('/home');
+    } catch (error: any) {
+      setLoginErrors({
+        password: error.message || 'Đăng nhập thất bại',
+      });
+    } finally {
+      setLoginLoading(false);
     }
   };
+
+  const register = useAuthStore((state) => state.register); // Lấy action register từ store
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,21 +142,43 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
 
     setSignupLoading(true);
 
-    const res = await mockSignup({
-      email: signupEmail,
-      password: signupPassword,
-      username: '',
-    });
-
-    setSignupLoading(false);
-
-    if (res.success) {
-      alert('Đăng ký thành công! Vui lòng đăng nhập.');
-      setTab('login');
-    } else {
-      setSignupErrors({
-        email: res.error,
+    try {
+      await register({
+        email: signupEmail,
+        password: signupPassword,
+        confirmPassword: signupConfirmPassword, // Gửi confirmPassword lên Backend
       });
+      alert('Đăng ký thành công! Vui lòng đăng nhập.');
+      navigate('/login'); // Navigate thay vì chỉ setTab
+    } catch (error: any) {
+      // Xử lý lỗi từ Backend
+      const errorMessage = error.message || 'Đăng ký thất bại';
+
+      // Kiểm tra nếu lỗi liên quan đến confirmPassword
+      if (
+        errorMessage.includes('confirmPassword') ||
+        errorMessage.includes('Xác nhận mật khẩu')
+      ) {
+        setSignupErrors({
+          confirmPassword: errorMessage,
+        });
+        setSignupConfirmStatus('error');
+        setSignupConfirmMessage(errorMessage);
+      } else if (
+        errorMessage.includes('email') ||
+        errorMessage.includes('Email')
+      ) {
+        setSignupErrors({
+          email: errorMessage,
+        });
+      } else {
+        // Lỗi chung, hiển thị ở email
+        setSignupErrors({
+          email: errorMessage,
+        });
+      }
+    } finally {
+      setSignupLoading(false);
     }
   };
 
@@ -248,7 +283,10 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
                       ? '0 8px 24px rgba(123,47,247,0.18)'
                       : 'none',
                 }}
-                onClick={() => setTab('login')}
+                onClick={() => {
+                  setTab('login');
+                  navigate('/login');
+                }}
               >
                 <span style={{ marginRight: 8 }}>📋</span> Login
               </Tabs.Tab>
@@ -272,7 +310,10 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
                       ? '0 8px 24px rgba(123,47,247,0.18)'
                       : 'none',
                 }}
-                onClick={() => setTab('signup')}
+                onClick={() => {
+                  setTab('signup');
+                  navigate('/register');
+                }}
               >
                 <span style={{ marginRight: 8 }}>👤</span> Sign Up
               </Tabs.Tab>
@@ -387,7 +428,7 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
                     <Anchor
                       size='sm'
                       style={{ color: '#666', cursor: 'pointer' }}
-                      onClick={() => navigate('/forgot-password')}
+                      onClick={() => navigate('/forgot')}
                     >
                       📧 Quên mật khẩu?
                     </Anchor>
@@ -550,7 +591,18 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
                       }}
                       required
                     />
-                    {signupConfirmStatus === 'error' &&
+                    {/* Hiển thị lỗi từ validation hoặc Backend */}
+                    {signupErrors.confirmPassword && (
+                      <Text
+                        size='xs'
+                        style={{ color: '#e03131', marginTop: 4 }}
+                      >
+                        {signupErrors.confirmPassword}
+                      </Text>
+                    )}
+                    {/* Hiển thị message từ real-time validation (nếu không có lỗi từ errors) */}
+                    {!signupErrors.confirmPassword &&
+                      signupConfirmStatus === 'error' &&
                       signupConfirmMessage && (
                         <Text
                           size='xs'
@@ -559,7 +611,8 @@ export default function LoginPage({ defaultTab = 'login' }: LoginPageProps) {
                           {signupConfirmMessage}
                         </Text>
                       )}
-                    {signupConfirmStatus === 'success' &&
+                    {!signupErrors.confirmPassword &&
+                      signupConfirmStatus === 'success' &&
                       signupConfirmMessage && (
                         <Text
                           size='xs'

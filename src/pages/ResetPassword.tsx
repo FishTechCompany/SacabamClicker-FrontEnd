@@ -1,14 +1,7 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react'; //useRef dùng để tham chiếu đến các input OTP, còn useState để quản lý trạng thái component
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  PasswordInput,
-  Text,
-  Title,
-  Group,
-  TextInput,
-} from '@mantine/core';
+import { Box, Button, PasswordInput, Text, Title, Group } from '@mantine/core';
+import * as authService from '../api/services/authService';
 
 const validatePasswordMessage = (password: string) => {
   if (!password) return 'Mật khẩu không được để trống';
@@ -74,7 +67,7 @@ export default function ResetPassword() {
     return 'Xác nhận mật khẩu thành công.';
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setPasswordError('');
     const pwdMsg = validatePasswordMessage(password);
     if (pwdMsg) {
@@ -85,16 +78,43 @@ export default function ResetPassword() {
     setConfirmMsg(confirmMessage);
     if (confirmMessage !== 'Xác nhận mật khẩu thành công.') return;
 
-    if (otp.join('').length < 6) return;
+    const otpString = otp.join('');
+    if (otpString.length < 6) {
+      setConfirmMsg('Vui lòng nhập đầy đủ 6 số OTP');
+      return;
+    }
+
+    if (!email) {
+      setConfirmMsg('Không tìm thấy email');
+      return;
+    }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await authService.resetPassword({
+        email,
+        otp: otpString,
+        newPassword: password,
+        confirmPassword: confirm,
+      });
+
+      if (response.status === 200) {
+        navigate('/login');
+        alert(
+          'Mật khẩu đã được đặt lại thành công. Vui lòng đăng nhập bằng mật khẩu mới.'
+        );
+      } else {
+        setConfirmMsg(response.message || 'Đặt lại mật khẩu thất bại');
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Đặt lại mật khẩu thất bại';
+      setConfirmMsg(message);
+    } finally {
       setLoading(false);
-      navigate('/login');
-      alert(
-        'Mật khẩu đã được đặt lại thành công. Vui lòng đăng nhập bằng mật khẩu mới.'
-      );
-    }, 1000);
+    }
   };
 
   return (
@@ -125,11 +145,13 @@ export default function ResetPassword() {
           Mã đã được gửi tới: {email || '—'}
         </Text>
 
-        <Group spacing={8} style={{ marginBottom: 12 }}>
+        <Group gap={8} style={{ marginBottom: 12 }}>
           {otp.map((v, i) => (
             <input
               key={i}
-              ref={(el) => (inputsRef.current[i] = el)}
+              ref={(el) => {
+                inputsRef.current[i] = el;
+              }}
               value={v}
               onChange={(e) => handleOtpChange(i, e.currentTarget.value)}
               onKeyDown={(e) => handleBackspace(i, e)}
@@ -190,10 +212,10 @@ export default function ResetPassword() {
           </Text>
         )}
 
-        <Group position='apart'>
+        <Group justify='space-between'>
           <Button
             variant='default'
-            onClick={() => navigate('/forgot-password')}
+            onClick={() => navigate('/forgot')}
             disabled={loading}
             style={{
               color: '#666',

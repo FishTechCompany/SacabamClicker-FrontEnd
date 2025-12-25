@@ -1,7 +1,5 @@
-import React from 'react';
 import { Text } from '@mantine/core';
 import { IconMoonStars, IconTrophy, IconLogout } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import styles from '../assets/styles/_global.module.scss';
 import { useAuthStore } from '../store/auth';
 
@@ -11,13 +9,12 @@ type Props = {
 };
 
 export default function Header({ isDark, onToggleDark }: Props) {
-  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
   const handleLogout = () => {
+    // logout() đã tự động redirect về /login và clear hết data
     logout();
-    navigate('/login');
   };
 
   return (
