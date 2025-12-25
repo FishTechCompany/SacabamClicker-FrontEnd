@@ -50,15 +50,15 @@ export const forgotPassword = async (
   return response.data;
 };
 
-export const verifyOTP = async (
-  data: VerifyOTPRequest
-): Promise<ApiResponse<null>> => {
-  const response = await axiosInstance.post<ApiResponse<null>>(
-    '/auth/verify-otp',
-    data
-  );
-  return response.data;
-};
+// export const verifyOTP = async (
+//   data: VerifyOTPRequest
+// ): Promise<ApiResponse<null>> => {
+//   const response = await axiosInstance.post<ApiResponse<null>>(
+//     '/auth/verify-otp',
+//     data
+//   );
+//   return response.data;
+// };
 
 export const resetPassword = async (
   data: ResetPasswordRequest
