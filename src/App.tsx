@@ -1,20 +1,79 @@
-import { Button, Container, Title, Text } from '@mantine/core';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import ErrorScreen from './pages/ErrorScreen';
+import Home from './pages/Home';
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 
 function App() {
   return (
-    <Container size="sm" style={{ textAlign: 'center', marginTop: '50px' }}>
-      <Title order={1} c="blue">
-        SacabamClicker
-      </Title>
-      
-      <Text size="xl" mt="md">
-        Dự án test của Goshujinsama khởi chạy thành công! 
-      </Text>
+    <BrowserRouter>
+      <Routes>
+        {/* Public Routes - Chỉ cho phép khi CHƯA đăng nhập */}
+        <Route
+          path='/login'
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path='/register'
+          element={
+            <PublicRoute>
+              <LoginPage defaultTab='signup' />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path='/forgot'
+          element={
+            <PublicRoute>
+              <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path='/reset'
+          element={
+            <PublicRoute>
+              <ResetPassword />
+            </PublicRoute>
+          }
+        />
 
-      <Button variant="filled" color="cyan" size="lg" mt="xl">
-        Bấm đi! (Test Mantine)
-      </Button>
-    </Container>
+        {/* Protected Routes - Chỉ cho phép khi ĐÃ đăng nhập */}
+        <Route
+          path='/home'
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Default route */}
+        <Route path='/' element={<Navigate to='/login' replace />} />
+
+        {/* 404 Error */}
+        <Route
+          path='*'
+          element={
+            <ErrorScreen
+              errorCode={404}
+              title='Không tìm thấy trang'
+              message='Đường dẫn không hợp lệ'
+              onRetry={() => window.location.replace('/login')}
+              onGoHome={() => window.location.replace('/login')}
+            />
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

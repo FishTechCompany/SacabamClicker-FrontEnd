@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MantineProvider } from '@mantine/core';
 import App from './App.tsx';
+import './assets/styles/_global.module.scss';
 
 // Import CSS bắt buộc của Mantine (QUAN TRỌNG NHẤT)
 import '@mantine/core/styles.css';
