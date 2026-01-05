@@ -53,3 +53,6 @@ Desktop.ini
 # --- VITE SPECIFIC  ---
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# --- Customize Files ---
+fe_pack_code.bat
